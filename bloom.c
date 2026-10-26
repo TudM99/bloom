@@ -23,15 +23,18 @@ static HDC     zmdc, zfdc;
 static HBITMAP zmbm, zfbm;
 static HGDIOBJ zobm, zofb;
 static HFONT   zfnt;
+static HFONT   ztfn;
 static int     zw, zh;
 static double  zcw, zch;
 static Vrn    *zmot;
 static int     znm, zrn;
 static Nod    *ztg;  static int ztc;
 static Nod    *zfl;  static int zfc;
+static Nod    *ztp;  static int ztn;
 static long    ztk;
 static int     znx;  static double zba;
 static int     zfx;  static double zfa;
+static int     zTn;  static double zTa;
 static int     zsp;
 static long    zfmt;
 static long    zend;
@@ -58,11 +61,11 @@ static void zfv(double x, double y, int g, double r, double gg, double b, int ki
 static void zbuild(void){
     double yt = zh * 0.055;
     zlry = zh * 0.150;
-    zlrx = zh * 0.098;
-    zloy = zh * 0.605;
+    zlrx = zh * 0.096;
+    zloy = zh * 0.610;
     zcx  = zw * 0.5;
     double lt = zloy - zlry;
-    double knotH = zch * 3.9;
+    double knotH = zch * 4.2;
     double knotTop = lt - knotH;
     double rw = zcw * 1.25;
 
@@ -70,28 +73,42 @@ static void zbuild(void){
     ztc = 0;
 
     for(double y = yt; y <= knotTop; y += zch * 0.60){
-        for(double x = zcx - rw; x <= zcx + rw; x += zcw * 0.72){
-            ztg[ztc].ax = x; ztg[ztc].ay = y; ztg[ztc].kk = 0; ztc++;
+        for(double x = zcx - rw; x <= zcx + rw; x += zcw * 0.70){
+            double u = fabs(x - zcx) / (rw + 1e-6);
+            ztg[ztc].ax = x; ztg[ztc].ay = y; ztg[ztc].kk = 0;
+            ztg[ztc].cr = 0.72 + 0.40 * (1.0 - u); ztc++;
         }
     }
 
-    int coils = 5;
+    int coils = 7;
+    double knw = zcw * 2.15;
     for(int c = 0; c <= coils; c++){
         double y = knotTop + knotH * (double)c/(double)coils;
-        double hw = zcw * 2.45 * (0.82 + 0.20 * sin(3.14159 * (double)c/(double)coils));
-        for(double x = zcx - hw; x <= zcx + hw; x += zcw * 0.58){
-            ztg[ztc].ax = x; ztg[ztc].ay = y; ztg[ztc].kk = 1; ztc++;
+        double hw = knw * (0.86 + 0.16 * sin(3.14159 * (double)c/(double)coils));
+        for(double x = zcx - hw; x <= zcx + hw; x += zcw * 0.56){
+            ztg[ztc].ax = x; ztg[ztc].ay = y; ztg[ztc].kk = 1;
+            ztg[ztc].cr = 1.08; ztc++;
         }
     }
 
-    double rO = 1.03, rI = 0.86;
-    for(double y = zloy - zlry*rO; y <= zloy + zlry*rO; y += zch * 0.58){
-        for(double x = zcx - zlrx*rO; x <= zcx + zlrx*rO; x += zcw * 0.70){
-            double nx = (x - zcx)/zlrx, ny = (y - zloy)/zlry;
-            double nr = sqrt(nx*nx + ny*ny);
-            if(nr >= rI && nr <= rO){
-                ztg[ztc].ax = x; ztg[ztc].ay = y; ztg[ztc].kk = 2; ztc++;
-            }
+    int ls = 170, bn = 2;
+    for(int i = 0; i < ls; i++){
+        double s  = 6.2831853 * (double)i / (double)ls;
+        double s2 = 6.2831853 * (double)(i+1) / (double)ls;
+        double x1 = zcx + zlrx * sin(s)  * sin(s  * 0.5);
+        double y1 = zloy - zlry * cos(s);
+        double x2 = zcx + zlrx * sin(s2) * sin(s2 * 0.5);
+        double y2 = zloy - zlry * cos(s2);
+        double tx = x2 - x1, ty = y2 - y1;
+        double tl = sqrt(tx*tx + ty*ty); if(tl < 1e-6) tl = 1e-6;
+        double nxn = -ty/tl, nyn = tx/tl;
+        for(int io = -bn; io <= bn; io++){
+            double off = (double)io * zcw * 0.62;
+            ztg[ztc].ax = x1 + nxn * off;
+            ztg[ztc].ay = y1 + nyn * off;
+            ztg[ztc].kk = 2;
+            ztg[ztc].cr = 0.74 + 0.40 * (1.0 - fabs((double)io)/(double)bn);
+            ztc++;
         }
     }
 
@@ -105,12 +122,13 @@ static void zbuild(void){
     const char *stm = "||!i";
     const char *lf  = "<>vVwY";
 
+    double fcy = zloy + zlry * 0.10;
     double cs = zcw * 2.5, rs = zch * 2.3;
-    for(double cy = zloy - zlry*1.30; cy <= zloy + zlry*1.30; cy += rs){
-        for(double cx0 = zcx - zlrx*1.35; cx0 <= zcx + zlrx*1.35; cx0 += cs){
+    for(double cy = fcy - zlry*1.20; cy <= fcy + zlry*1.20; cy += rs){
+        for(double cx0 = zcx - zlrx*1.32; cx0 <= zcx + zlrx*1.32; cx0 += cs){
             double jx = cx0 + (zrnd()*2-1)*zcw*1.1;
             double jy = cy  + (zrnd()*2-1)*zch*0.9;
-            double nx = (jx - zcx)/zlrx, ny = (jy - zloy)/zlry;
+            double nx = (jx - zcx)/zlrx, ny = (jy - fcy)/zlry;
             double nr = sqrt(nx*nx + ny*ny);
             double ang = atan2(ny, nx);
             double oa = 0.98 + a1*sin(ang + p1) + a2*sin(2.0*ang + p2);
@@ -155,9 +173,9 @@ static void zbuild(void){
     }
 
     double fs2 = zcw * 1.0, fr2 = zch * 0.95;
-    for(double cy = zloy - zlry*1.25; cy <= zloy + zlry*1.25; cy += fr2){
-        for(double cx0 = zcx - zlrx*1.30; cx0 <= zcx + zlrx*1.30; cx0 += fs2){
-            double nx = (cx0 - zcx)/zlrx, ny = (cy - zloy)/zlry;
+    for(double cy = fcy - zlry*1.18; cy <= fcy + zlry*1.18; cy += fr2){
+        for(double cx0 = zcx - zlrx*1.28; cx0 <= zcx + zlrx*1.28; cx0 += fs2){
+            double nx = (cx0 - zcx)/zlrx, ny = (cy - fcy)/zlry;
             double nr = sqrt(nx*nx + ny*ny);
             double ang = atan2(ny, nx);
             double oa = 0.98 + a1*sin(ang + p1) + a2*sin(2.0*ang + p2);
@@ -213,13 +231,54 @@ static void zspawn(Vrn *m, int top){
     m->qn = zrnd()*6.28; m->qs = 1.0;
 }
 
+static void zmktext(void){
+    ztp = (Nod*)malloc(sizeof(Nod) * 60000);
+    ztn = 0;
+    const char *l1 = "don't do it.";
+    const char *l2 = "smell the flowers";
+    int fh = (int)(zh * 0.078);
+    HFONT tf = CreateFontA(fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET,
+        OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY, FF_SWISS, "Segoe UI");
+    int tw = zw, th = fh * 3;
+    HDC td = CreateCompatibleDC(zmdc);
+    HBITMAP tb = CreateCompatibleBitmap(zmdc, tw, th);
+    HGDIOBJ ob = SelectObject(td, tb);
+    HGDIOBJ of = SelectObject(td, tf);
+    PatBlt(td, 0, 0, tw, th, BLACKNESS);
+    SetBkMode(td, OPAQUE);
+    SetBkColor(td, RGB(0, 0, 0));
+    SetTextColor(td, RGB(255, 255, 255));
+    SetTextAlign(td, TA_CENTER | TA_TOP);
+    TextOutA(td, tw/2, 0, l1, (int)strlen(l1));
+    TextOutA(td, tw/2, fh + fh/5, l2, (int)strlen(l2));
+
+    double oy = zh * 0.820;
+    double gc = zh * 0.0062; if(gc < 4) gc = 4;
+    for(double y = 0; y < th; y += gc){
+        for(double x = 0; x < tw; x += gc){
+            COLORREF c = GetPixel(td, (int)x, (int)y);
+            if(GetGValue(c) > 100){
+                ztp[ztn].ax = x; ztp[ztn].ay = oy + y; ztn++;
+            }
+        }
+    }
+    for(int i = 0; i < ztn; i++){
+        int bi = i;
+        for(int j = i+1; j < ztn; j++) if(ztp[j].ax < ztp[bi].ax) bi = j;
+        Nod t = ztp[i]; ztp[i] = ztp[bi]; ztp[bi] = t;
+    }
+    SelectObject(td, of); SelectObject(td, ob);
+    DeleteObject(tb); DeleteObject(tf); DeleteDC(td);
+}
+
 static void zinit(void){
     zbuild();
+    zmktext();
     zrn = (int)((zw/zcw) * (zh/zch) * 0.14);
     int need = (int)(ztc * 1.7) + 400;
     if(zrn < need) zrn = need;
     if(zrn > 9000) zrn = 9000;
-    znm = zrn + zfc;
+    znm = zrn + zfc + ztn;
     zmot = (Vrn*)malloc(sizeof(Vrn) * znm);
     for(int i = 0; i < zrn; i++) zspawn(&zmot[i], 0);
     for(int i = 0; i < zfc; i++){
@@ -239,7 +298,18 @@ static void zinit(void){
         m->qk = zfl[i].cr; m->ql = zfl[i].cg; m->qm = zfl[i].cb;
         m->qn = zrnd()*6.28; m->qs = 1.0;
     }
+    for(int i = 0; i < ztn; i++){
+        Vrn *m = &zmot[zrn + zfc + i];
+        m->qa = ztp[i].ax + (zrnd()*2-1)*zcw*0.3;
+        m->qb = ztp[i].ay + zch*1.3;
+        m->qc = 1.0; m->qd = zpool[rand() % (int)strlen(zpool)];
+        m->qe = 0; m->qf = 2; m->qj = 1;
+        m->qh = ztp[i].ax; m->qi = ztp[i].ay;
+        m->qk = 0.99; m->ql = 0.96; m->qm = 0.86;
+        m->qn = zrnd()*6.28; m->qs = 1.0;
+    }
     zsp = 1; znx = 0; zba = 0; zfx = 0; zfa = 0;
+    zTn = 0; zTa = 0;
     zphase = 0; zfmt = 0; zend = 0;
 }
 
@@ -255,18 +325,7 @@ static void zbind(void){
     if(bi < 0) return;
     zmot[bi].qf = 1; zmot[bi].qj = 1;
     zmot[bi].qh = g->ax; zmot[bi].qi = g->ay;
-    double sh;
-    if(g->kk == 2){
-        double nx = (g->ax - zcx)/zlrx, ny = (g->ay - zloy)/zlry;
-        double nr = sqrt(nx*nx + ny*ny);
-        sh = 0.74 + 0.40 * (1.0 - fabs(nr - 0.945)/0.11);
-    } else if(g->kk == 1){
-        sh = 1.06;
-    } else {
-        double w = zcw * 1.3, dxs = fabs(g->ax - zcx);
-        double u = dxs > w ? 1.0 : dxs/w;
-        sh = 0.72 + 0.40 * (1.0 - u);
-    }
+    double sh = (g->cr > 0.01) ? g->cr : 1.0;
     if(sh < 0.5) sh = 0.5; if(sh > 1.12) sh = 1.12;
     zmot[bi].qs = sh;
     znx++;
@@ -289,6 +348,11 @@ static void zstep(void){
         while(zfa >= 1.0 && zfx < zfc && gd < 6){ zmot[zrn + zfx].qe = 1.0; zfx++; zfa -= 1.0; gd++; }
     }
     if(zphase == 2 && zfx >= zfc){ zphase = 3; zend = ztk; }
+    if(zphase == 3 && zTn < ztn){
+        zTa += (double)ztn / 42.0;
+        int gd = 0;
+        while(zTa >= 1.0 && zTn < ztn && gd < 30){ zmot[zrn + zfc + zTn].qe = 1.0; zTn++; zTa -= 1.0; gd++; }
+    }
 
     double pls = 1.0 + 0.06 * sin(ztk * 0.045);
 
@@ -328,6 +392,7 @@ static void zdraw(void){
     SelectObject(zmdc, zfnt);
     char bc[2]; bc[1] = 0;
     for(int i = 0; i < znm; i++){
+        if(i == zrn + zfc) SelectObject(zmdc, ztfn);
         Vrn *m = &zmot[i];
         if(m->qe < 6) continue;
         if(m->qf == 0 && m->qb > zh + zch) continue;
@@ -343,9 +408,9 @@ static LRESULT CALLBACK zproc(HWND h, UINT u, WPARAM w, LPARAM l){
         case WM_TIMER:
             zstep(); zdraw();
             InvalidateRect(h, NULL, FALSE);
-            if(zphase == 3 && ztk >= zend + 80){ zphase = 4; zend = ztk; }
+            if(zphase == 3 && ztk >= zend + 170){ zphase = 4; zend = ztk; }
             if(zphase == 4 && ztk >= zend + 52){ DestroyWindow(h); }
-            if(ztk > 1200){ DestroyWindow(h); }
+            if(ztk > 1700){ DestroyWindow(h); }
             return 0;
         case WM_PAINT: {
             PAINTSTRUCT ps; HDC d = BeginPaint(h, &ps);
@@ -384,6 +449,10 @@ __declspec(dllexport) void CALLBACK Bloom(HWND h, HINSTANCE ii, LPSTR s, int n){
     zfnt = CreateFontA(18, 0, 0, 0, FW_NORMAL, 0, 0, 0,
         DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
         ANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
+    int tfs = (int)(zh * 0.0086); if(tfs < 8) tfs = 8;
+    ztfn = CreateFontA(tfs, 0, 0, 0, FW_NORMAL, 0, 0, 0,
+        DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
+        ANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
 
     zmdc = CreateCompatibleDC(wd);
     zmbm = CreateCompatibleBitmap(wd, zw, zh);
@@ -415,6 +484,6 @@ __declspec(dllexport) void CALLBACK Bloom(HWND h, HINSTANCE ii, LPSTR s, int n){
     ShowCursor(TRUE);
     SelectObject(zmdc, zobm); DeleteObject(zmbm); DeleteDC(zmdc);
     SelectObject(zfdc, zofb); DeleteObject(zfbm); DeleteDC(zfdc);
-    DeleteObject(zfnt); ReleaseDC(zwnd, wd);
-    free(zmot); free(ztg); free(zfl);
+    DeleteObject(zfnt); DeleteObject(ztfn); ReleaseDC(zwnd, wd);
+    free(zmot); free(ztg); free(zfl); free(ztp);
 }
